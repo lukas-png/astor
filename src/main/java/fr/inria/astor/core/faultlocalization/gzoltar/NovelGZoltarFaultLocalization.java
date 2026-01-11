@@ -81,7 +81,19 @@ public class NovelGZoltarFaultLocalization implements FaultLocalizationStrategy 
 		String testClassPath = String.join(File.pathSeparator, project.getProperties().getOriginalTestBinDir());
 
 		// Junit path
-		String junitpath = retrieveJUnitLibPath();
+		String junitpath = "/opt/astor/lib/junit-4.12.jar" + File.pathSeparator + "/opt/astor/lib/hamcrest-core-1.3.jar";
+
+		String retrievedJunitPath = retrieveJUnitLibPath();
+		if (retrievedJunitPath != null && !retrievedJunitPath.isEmpty()) {
+			junitpath = retrievedJunitPath;
+		} else {
+			System.out.println("Dependencies not found in classpath, using hardcoded paths: " + junitpath);
+			for (String path : junitpath.split(File.pathSeparator)) {
+				if (!new File(path).exists()) {
+					System.err.println("Error: Hardcoded dependency not found at: " + path);
+				}
+			}
+		}
 
 		// GZoltar path
 		String gzoltarversion = ConfigurationProperties.getProperty("gzoltarVersion");
@@ -93,22 +105,50 @@ public class NovelGZoltarFaultLocalization implements FaultLocalizationStrategy 
 
 		// Refine the test cases
 
-		List<String> testMethodToRun = allTest.stream().filter(e -> e.contains("#")).collect(Collectors.toList());
-		List<String> testClassesToRun = allTest.stream().filter(e -> !e.contains("#")).collect(Collectors.toList());
+		System.out.println("DEBUG: Failing tests defined in properties: " + failingTest);
+
+		List<String> testMethodToRun = allTest.stream()
+				.filter(e -> e.contains("#"))
+				.map(e -> e.contains(",") ? e.split(",")[1] : e)
+				.collect(Collectors.toList());
+
+		List<String> testClassesToRun = allTest.stream()
+				.filter(e -> !e.contains("#"))
+				.map(e -> e.contains(",") ? e.split(",")[1] : e)
+				.collect(Collectors.toList());
 
 		Path pathTestFile = new File(pathTestsFiles).toPath();
-		try (Stream<String> lines = Files.lines(pathTestFile)) {
-			List<String> replaced = lines.filter(e -> allTest.isEmpty() || (testMethodToRun.contains(e.split(",")[1])
-					|| testClassesToRun.contains(e.split(",")[1].split("#")[0]))
+		if (!Files.exists(pathTestFile)) {
+			throw new RuntimeException("GZoltar failed to generate test file at " + pathTestsFiles + ". The command to list test methods failed (see logs above).");
+		}
 
-			).collect(Collectors.toList());
-			System.out.println("Filtered " + replaced);
+		try (Stream<String> lines = Files.lines(pathTestFile)) {
+			List<String> replaced = lines.filter(e -> {
+				try {
+					String testName = e.contains(",") ? e.split(",")[1] : e;
+					String className = testName.contains("#") ? testName.split("#")[0] : testName;
+
+					boolean keep = allTest.isEmpty() || (testMethodToRun.contains(testName)
+						|| testClassesToRun.contains(className));
+
+					// Highlighting if a expected failing test is being kept
+					if (keep && failingTest.stream().anyMatch(ft -> testName.contains(ft))) {
+						System.out.println("DEBUG: Keeping expected failing test for execution: " + testName);
+					}
+
+					return keep;
+				} catch (Exception ex) {
+					System.err.println("Error filtering line (skipping): " + e);
+					return false;
+				}
+			}).collect(Collectors.toList());
+			System.out.println("Filtered tests count: " + replaced.size());
 			Files.write(pathTestFile, replaced);
 		}
 
 		String commandRunTestMethods = "java " + maxmemory + " -javaagent:" + gzoltar_agent_jar + "=destfile=" + serfile
 				+ ",buildlocation=" + src_classes_dir + ",inclnolocationclasses=false,output=FILE" + "        -cp "
-				+ src_classes_dir + ":" + junitpath + ":" + testClassPath + ":" + gzoltar_cli_jar
+				+ src_classes_dir + File.pathSeparator + junitpath + File.pathSeparator + testClassPath + File.pathSeparator + gzoltar_cli_jar
 				+ "  com.gzoltar.cli.Main runTestMethods " + "   --testMethods " + pathTestsFiles
 				+ "  --collectCoverage";
 
@@ -135,11 +175,11 @@ public class NovelGZoltarFaultLocalization implements FaultLocalizationStrategy 
 
 		String runRapportCommand = "java -XX:MaxPermSize=4096M " + "-cp "
 
-				+ src_classes_dir + ":"
+				+ src_classes_dir + File.pathSeparator
 
-				+ junitpath + ":"
+				+ junitpath + File.pathSeparator
 
-				+ testClassPath + ":"
+				+ testClassPath + File.pathSeparator
 
 				+ gzoltar_cli_jar + "      com.gzoltar.cli.Main faultLocalizationReport " + "        --buildLocation "
 
@@ -182,7 +222,7 @@ public class NovelGZoltarFaultLocalization implements FaultLocalizationStrategy 
 
 	private void retrieveTestCases(Integer timeoutMiliseconds, String pathTestsFiles, String src_classes_dir,
 			String testClassPath, String junitpath, String gzoltar_cli_jar) throws IOException, InterruptedException {
-		String commandGetTest = "java -cp " + src_classes_dir + ":" + testClassPath + ":" + junitpath + ":"
+		String commandGetTest = "java -cp " + src_classes_dir + File.pathSeparator + testClassPath + File.pathSeparator + junitpath + File.pathSeparator
 				+ gzoltar_cli_jar + "  com.gzoltar.cli.Main listTestMethods " + testClassPath + "    --outputFile "
 				+ pathTestsFiles;
 
@@ -192,6 +232,20 @@ public class NovelGZoltarFaultLocalization implements FaultLocalizationStrategy 
 		new Thread(new Runnable() {
 			public void run() {
 				BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+				String line = null;
+
+				try {
+					while ((line = input.readLine()) != null)
+						System.out.println(line);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}).start();
+
+		new Thread(new Runnable() {
+			public void run() {
+				BufferedReader input = new BufferedReader(new InputStreamReader(p.getErrorStream()));
 				String line = null;
 
 				try {
@@ -263,7 +317,7 @@ public class NovelGZoltarFaultLocalization implements FaultLocalizationStrategy 
 		String np = "";
 		for (String aJar : cps) {
 
-			if (aJar.contains("junit-4.12.jar") || aJar.contains("hamcrest-core-1.3.jar")) {
+			if (aJar.contains("junit-") || aJar.contains("hamcrest-core")) {
 
 				np += ((np.isEmpty()) ? "" : File.pathSeparator) + aJar;
 			}
@@ -283,7 +337,7 @@ public class NovelGZoltarFaultLocalization implements FaultLocalizationStrategy 
 			System.out.println("Test all " + testall);
 
 		} catch (Exception e1) {
-			e1.printStackTrace();
+		 e1.printStackTrace();
 		}
 		return testall;
 
@@ -390,7 +444,7 @@ public class NovelGZoltarFaultLocalization implements FaultLocalizationStrategy 
 			}
 
 		} catch (IOException e) {
-			e.printStackTrace();
+		 e.printStackTrace();
 		}
 
 		results.setFailingTestCasesClasses(failingTestCasesClasses);
