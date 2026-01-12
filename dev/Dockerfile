@@ -9,10 +9,16 @@ RUN apt-get update && apt-get install -y \
     unzip curl wget ca-certificates \
     ant maven \
     openjdk-8-jdk \
-    openjdk-11-jdk \
     && rm -rf /var/lib/apt/lists/*
 
-ENV JAVA7_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
+ENV ZULU7_TGZ=zulu7.56.0.11-ca-jdk7.0.352-linux_x64.tar.gz
+RUN mkdir -p /opt/jdks && \
+    curl -fsSL "https://cdn.azul.com/zulu/bin/${ZULU7_TGZ}" -o "/tmp/${ZULU7_TGZ}" && \
+    tar -xzf "/tmp/${ZULU7_TGZ}" -C /opt/jdks && \
+    rm -f "/tmp/${ZULU7_TGZ}"
+
+ENV JAVA7_HOME=/opt/jdks/zulu7.56.0.11-ca-jdk7.0.352-linux_x64
 ENV JAVA8_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
 ENV JAVA_HOME=${JAVA7_HOME}
@@ -38,6 +44,18 @@ RUN printf '%s\n' \
 WORKDIR /opt
 RUN git clone https://github.com/rjust/defects4j.git
 WORKDIR /opt/defects4j
+
+# Checkout Defects4J v1.x line (classic APR setups) :contentReference[oaicite:3]{index=3}
+RUN git checkout v1.1.0
+
+# Overwrite init.sh with local customized version
+COPY init.sh /opt/defects4j/init.sh
+RUN chmod +x /opt/defects4j/init.sh
+
+# Overwrite repo downloader with local version (new download host, v1 archive)
+COPY get_repos.sh /opt/defects4j/project_repos/get_repos.sh
+RUN chmod +x /opt/defects4j/project_repos/get_repos.sh
+
 RUN /usr/local/bin/use-java7 >/dev/null 2>&1 || true
 RUN cpanm --installdeps .
 RUN ./init.sh
