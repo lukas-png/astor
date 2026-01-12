@@ -7,7 +7,7 @@ WORK="${3:-/work}"
 MAXTIME="${MAXTIME:-60}"
 
 # Bug checkout + compile
-/usr/local/bin/use-java7 >/dev/null 2>&1 || true
+. /usr/local/bin/use-java7 >/dev/null 2>&1 || true
 /usr/local/bin/d4j-checkout "$BUG"
 
 BUGDIR="${WORK}/${BUG}"
@@ -34,7 +34,7 @@ FAILING_TEST="${FAILING_TEST_RAW/::/#}"
 SRC="$(defects4j export -p dir.src.classes)"
 TST="$(defects4j export -p dir.src.tests)"
 BIN="$(defects4j export -p dir.bin.classes)"
-BINT="$(defects4j export -p dir.bin.tests)"
+BINT="/target/tests"
 DEPS="$(defects4j export -p cp.compile)"
 
 # Manche Projekte brauchen cp.test statt cp.compile (falls Astor/Test-Klassen fehlen)
@@ -69,6 +69,6 @@ echo "[*] Using ASTOR_JAR: $ASTOR_JAR_REAL"
 GZOLTAR_JAR_DIR="${GZOLTAR_JAR_DIR:-/opt/astor/lib}"
 
 # WICHTIG: Astor läuft  mit Java 8
-/usr/local/bin/use-java8 >/dev/null 2>&1 || true
+. /usr/local/bin/use-java8 >/dev/null 2>&1 || true
 
-java -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005 -Xmx4g -cp "$ASTOR_JAR_REAL" fr.inria.main.evolution.AstorMain -location . -mode jgenprog -scope package -failing "$FAILING_TEST" -dependencies "$DEPS" -srcjavafolder "$SRC" -srctestfolder "$TST" -binjavafolder "$BIN" -bintestfolder "$BINT" -maxtime "$MAXTIME" -stopfirst true -faultlocalization gzoltar -locationGzoltarJar "$GZOLTAR_JAR_DIR"
+java -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005 -Xmx4g -cp "$ASTOR_JAR_REAL" fr.inria.main.evolution.AstorMain -location . -mode jgenprog -scope package -failing "$FAILING_TEST" -dependencies "$DEPS" -srcjavafolder "$SRC" -srctestfolder "$TST" -binjavafolder "$BIN" -bintestfolder "$BINT" -maxtime "$MAXTIME" -stopfirst true -faultlocalization gzoltar -locationGzoltarJar "$GZOLTAR_JAR_DIR"
