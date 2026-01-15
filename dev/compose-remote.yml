@@ -1,0 +1,10 @@
+services:
+  astor-remote:
+    build:
+      context: ../
+      dockerfile: dev/Dockerfile.remote
+    working_dir: /work
+    tty: true
+    ports:
+      - "5005:5005"
+
