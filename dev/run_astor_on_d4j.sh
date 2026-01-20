@@ -67,8 +67,14 @@ echo "[*] Using ASTOR_JAR: $ASTOR_JAR_REAL"
 
 
 GZOLTAR_JAR_DIR="${GZOLTAR_JAR_DIR:-/opt/astor/lib}"
+DEBUG_SUSPEND="${DEBUG_SUSPEND:-y}"
+DEBUG_PORT="${DEBUG_PORT:-5005}"
+DEBUG_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=${DEBUG_SUSPEND},address=${DEBUG_PORT}"
 
 # WICHTIG: Astor läuft  mit Java 8
 . /usr/local/bin/use-java8 >/dev/null 2>&1 || true
 
-java -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005 -Xmx4g -cp "$ASTOR_JAR_REAL" fr.inria.main.evolution.AstorMain -location . -mode jgenprog -scope package -failing "$FAILING_TEST" -dependencies "$DEPS" -srcjavafolder "$SRC" -srctestfolder "$TST" -binjavafolder "$BIN" -bintestfolder "$BINT" -maxtime "$MAXTIME" -stopfirst true -faultlocalization gzoltar -locationGzoltarJar "$GZOLTAR_JAR_DIR"
+# If DEBUG_SUSPEND is "n", we can pass it to java.
+# If you don't want debug at all, we could clear DEBUG_OPTS, but keeping it open is usually fine in container.
+
+java $DEBUG_OPTS -Xmx4g -cp "$ASTOR_JAR_REAL" fr.inria.main.evolution.AstorMain -location . -mode jgenprog -scope package -failing "$FAILING_TEST" -dependencies "$DEPS" -srcjavafolder "$SRC" -srctestfolder "$TST" -binjavafolder "$BIN" -bintestfolder "$BINT" -maxtime "$MAXTIME" -stopfirst true -faultlocalization gzoltar -locationGzoltarJar "$GZOLTAR_JAR_DIR"
