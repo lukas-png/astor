@@ -85,11 +85,8 @@ ENV ASTOR_HOME=/opt/astor
 # --- Remote Build Specifics (Copy Astor Source) ---
 COPY . /opt/astor
 WORKDIR /opt/astor
-# Build Astor inside the image
-RUN export JAVA_HOME=${JAVA8_HOME} && \
-    export PATH=${JAVA_HOME}/bin:${PATH} && \
-    java -version && \
-    mvn -DskipTests package
 
 WORKDIR /work
-CMD ["bash"]
+COPY dev/rebuild.sh /rebuild.sh
+RUN chmod +x /rebuild.sh
+CMD ["/bin/bash", "-c", "/rebuild.sh && exec bash"]

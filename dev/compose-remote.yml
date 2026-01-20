@@ -7,4 +7,9 @@ services:
     tty: true
     ports:
       - "5005:5005"
+    volumes:
+      - m2-cache:/root/.m2
 
+
+volumes:
+  m2-cache:
