@@ -1,0 +1,15 @@
+language: java
+
+install: "./.travis_install.sh"
+
+script: mvn test -Dtest=fr.inria.astor.test.repair.evaluation.JGenProgTest,fr.inria.astor.test.repair.evaluation.MutRepairTest,fr.inria.astor.test.repair.evaluation.IntroClassTest
+
+jdk:
+  - oraclejdk7
+
+notifications:
+  email:
+    - martin.monperrus@univ-lille1.fr
+    - matias.sebastian.martinez@usi.ch
+
+
