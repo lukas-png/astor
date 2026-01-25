@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -46,7 +46,7 @@ RUN git clone https://github.com/rjust/defects4j.git
 WORKDIR /opt/defects4j
 
 # Checkout Defects4J v1.x line (classic APR setups) :contentReference[oaicite:3]{index=3}
-RUN git checkout v1.1.0
+RUN git checkout v0.1.0
 
 # Overwrite init.sh with local customized version
 COPY init.sh /opt/defects4j/init.sh
